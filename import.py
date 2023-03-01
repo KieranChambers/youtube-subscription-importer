@@ -20,7 +20,7 @@ TARGET_SCOPES = [
     "https://www.googleapis.com/auth/youtube",
 ]
 
-reset_script = True
+reset_script = False
 
 
 def get_authenticated_service_origin(credentials=None):

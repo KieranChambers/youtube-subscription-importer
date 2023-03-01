@@ -1,4 +1,7 @@
 client_secrets.json
-tokens/*
-subscriptions/*
+subscriptions/origin_subscriptions.json
+subscriptions/target_subscriptions.json
+subscriptions/unique_subscriptions.json
+tokens/origin_token.json
+tokens/target_token.json
 .vscode/

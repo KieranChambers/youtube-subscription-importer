@@ -1,0 +1,9 @@
+{
+  "token": "ya29IyBP9ehOQfiRd0oA5zoKRFzNBYg0163",
+  "refresh_token": "1//0coEOaPnG1pZDE",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "client_id": "gu6jg72n1tvofluivg3.apps.googleusercontent.com",
+  "client_secret": "rzxigY_5xQ",
+  "scopes": ["https://www.googleapis.com/auth/youtube.readonly"],
+  "expiry": "2023-03-01T19:10:52.285391Z"
+}
