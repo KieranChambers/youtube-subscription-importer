@@ -2,14 +2,14 @@ import os
 import json
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
-from dotenv import load_dotenv
 
-# pip install google-api-python-client google-auth python-dotenv
-load_dotenv()
 
-# Replace with your client ID and client secret
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+# Loaded from the client_secrets.json file
+with open('client_secrets.json', "r") as secrets_json:
+    clientSecrets = json.load(secrets_json)
+    CLIENT_ID = clientSecrets['installed']['client_id']
+    CLIENT_SECRET = clientSecrets['installed']['client_secret']
+
 
 # Defining the scope for the origin account
 ORIGIN_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
@@ -40,8 +40,8 @@ def get_authenticated_service_origin(credentials=None):
             )
             credentials = flow.run_local_server(
                 port=0,
-                authorization_prompt_message="Opening the browser to authenticate..",
-                success_message="Success! You may now close the window.",
+                authorization_prompt_message="Authorization required for the origin account. Opening the browser to authenticate..",
+                success_message="Success! Origin account authorized. You may now close the window.",
             )
 
             # Save the credentials for the next run
@@ -55,6 +55,8 @@ def get_authenticated_service_origin(credentials=None):
 
 
 def get_origin_subscriptions():
+    print("Getting subscriptions from origin account..")
+
     # If the JSON file exists and the reset_script variable is False, then read the data from the JSON file
     if os.path.exists("subscriptions/origin_subscriptions.json") and not reset_script:
         with open("subscriptions/origin_subscriptions.json", "r") as json_file:
@@ -70,12 +72,14 @@ def get_origin_subscriptions():
             .list(part="snippet", mine=True, maxResults=50)
             .execute()
         )
+
         subscriptions = []
 
         # Loop through each page of the list until there are no more items
         while subscriptions_list_response:
             for subscription in subscriptions_list_response.get("items", []):
-                subscriptions.append(subscription["snippet"]["resourceId"]["channelId"])
+                subscriptions.append(
+                    subscription["snippet"]["resourceId"]["channelId"])
 
             # Check if there are more items to retrieve
             if "nextPageToken" in subscriptions_list_response:
@@ -103,6 +107,7 @@ def get_origin_subscriptions():
 
 
 def get_authenticated_service_target(target_credentials=None):
+
     # Get credentials for the target account
     if not target_credentials:
         if os.path.exists("tokens/target_token.json"):
@@ -119,8 +124,8 @@ def get_authenticated_service_target(target_credentials=None):
             )
             target_credentials = flow.run_local_server(
                 port=0,
-                _DEFAULT_AUTH_PROMPT_MESSAGE="This is a test",
-                success_message="Success! You may now close the window.",
+                _DEFAULT_AUTH_PROMPT_MESSAGE="Authorization required for the target account. Opening the browser to authenticate..",
+                success_message="Success! Target account authorized. You may now close the window.",
             )
 
             # Save the credentials for the next run
@@ -134,6 +139,8 @@ def get_authenticated_service_target(target_credentials=None):
 
 
 def get_target_subscriptions():
+    print("Getting subscriptions from target account..")
+
     # If the JSON file exists and the reset_script variable is False, then read the data from the JSON file
     if os.path.exists("subscriptions/target_subscriptions.json") and not reset_script:
         with open("subscriptions/target_subscriptions.json", "r") as json_file:
@@ -149,12 +156,14 @@ def get_target_subscriptions():
             .list(part="snippet", mine=True, maxResults=50)
             .execute()
         )
+
         subscriptions = []
 
         # Loop through each page of the list until there are no more items
         while subscriptions_list_response:
             for subscription in subscriptions_list_response.get("items", []):
-                subscriptions.append(subscription["snippet"]["resourceId"]["channelId"])
+                subscriptions.append(
+                    subscription["snippet"]["resourceId"]["channelId"])
 
             # Check if there are more items to retrieve
             if "nextPageToken" in subscriptions_list_response:
@@ -186,6 +195,8 @@ def remove_duplicates(subscriptions, target_subscriptions):
     if os.path.exists("subscriptions/unique_subscriptions.json") and not reset_script:
         with open("subscriptions/unique_subscriptions.json", "r") as json_file:
             unique_arr = json.load(json_file)
+            print(
+                f"unique_subscriptions.json exists. New subscriptions to add: {len(unique_arr)}")
             return unique_arr
     else:
         unique_origin_subscriptions = set(subscriptions)
@@ -193,52 +204,61 @@ def remove_duplicates(subscriptions, target_subscriptions):
         unique_set = unique_origin_subscriptions.symmetric_difference(
             unique_target_subscriptions
         )
+        if len(unique_set) == 0:
+            print("No new subscriptions to add. Exiting.")
+            exit()
+        else:
+            # Convert the set back to a list and sort it
+            unique_arr = list(unique_set)
+            unique_arr.sort()
 
-        # Convert the set back to a list and sort it
-        unique_arr = list(unique_set)
-        unique_arr.sort()
-
-        # Write the unique subscriptions data to the JSON file
-        with open("subscriptions/unique_subscriptions.json", "w") as json_file:
-            json.dump(unique_arr, json_file)
-        return unique_arr
+            # Write the unique subscriptions data to the JSON file
+            with open("subscriptions/unique_subscriptions.json", "w") as json_file:
+                json.dump(unique_arr, json_file)
+            print(
+                f"Created unique_subscriptions.json. New subscriptions to add: {len(unique_arr)}")
+            return unique_arr
 
 
 def subscribe_to_channels(unique_subscriptions, length):
+    print('Adding the new subscriptions to the target account')
     # Build the YouTube API client for the target account
     target_youtube = get_authenticated_service_target()
     # Subscribe to each channel on the target account
-    if os.path.exists("subscriptions/unique_subscriptions.json"):
-        with open("subscriptions/unique_subscriptions.json", "r") as json_file:
-            unique_subscriptions = json.load(json_file)
 
-    i = 0
-    for channel in unique_subscriptions:
+    with open("subscriptions/unique_subscriptions.json", "r") as json_file:
+        unique_subscriptions = json.load(json_file)
+
+    i = 1
+    for channel in unique_subscriptions.copy():
         try:
-            print(f"Running {i} of {length}")
+            print(
+                f"Running {i} of {length}. Adding {channel} from the Subscriptions.")
             target_youtube.subscriptions().insert(
                 part="snippet",
                 body={"snippet": {"resourceId": {"channelId": channel}}},
             ).execute()
+            # Remove the channel from the list
             unique_subscriptions.remove(channel)
+            # Write the unique subscriptions data to the JSON file
+            with open("subscriptions/unique_subscriptions.json", "w") as json_file:
+                print(f'Removing {channel} from the JSON file.')
+                json.dump(unique_subscriptions, json_file)
             i += 1
         except Exception as e:
             print(e)
 
 
 if __name__ == "__main__":
-    # Get the subscriptions subscribed to by the origin account
-    print("Getting subscriptions from origin account")
+    # Get the subscriptions for the origin account
     subscriptions = get_origin_subscriptions()
 
-    # Get the subscriptions subscribed to by the target account
-    print("Getting subscriptions from target account")
+    # Get the subscriptions for the target account
     target_subscriptions = get_target_subscriptions()
 
-    # Remove the subscriptions that are already subscribed to by the target account
-    unique_subscriptions = remove_duplicates(subscriptions, target_subscriptions)
-    print(f"New subscriptions to add: {len(unique_subscriptions)}")
+    # Remove the duplicate subscriptions
+    unique_subscriptions = remove_duplicates(
+        subscriptions, target_subscriptions)
 
-    # # Subscribe to the subscriptions on the target account
-    # print('Subscribing to new subscriptions')
-    # subscribe_to_channels(unique_subscriptions, len(unique_subscriptions))
+    # Subscribe to the new channels
+    subscribe_to_channels(unique_subscriptions, len(unique_subscriptions))

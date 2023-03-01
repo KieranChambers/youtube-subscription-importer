@@ -1,3 +1,4 @@
-.env
 client_secrets.json
+tokens/*
+subscriptions/*
 .vscode/
